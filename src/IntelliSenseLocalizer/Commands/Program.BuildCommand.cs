@@ -24,7 +24,7 @@ internal partial class Program
 	</PropertyGroup>
 
 	<ItemGroup>
-		<None Include="".\**\*.xml"" Pack=""True"" PackagePath=""content"" />
+		<None Include="".**\*.xml"" Pack=""True"" PackagePath=""content"" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -135,7 +135,7 @@ internal partial class Program
                                                        .GroupBy(m => m.Moniker)
                                                        .SelectMany(GetDistinctApplicationPackRefMonikerDescriptors)
                                                        .SelectMany(m => m.Refs)
-                                                       .Where(m => m.Culture is null)
+                                                       .Where(m => m.Culture is null || m.Culture.Name.Equals("zh-cn", StringComparison.OrdinalIgnoreCase))
                                                        .ToArray();
 
         if (!refDescriptors.Any())
@@ -161,6 +161,7 @@ internal partial class Program
             var parallelOptions = new ParallelOptions() { MaxDegreeOfParallelism = parallelCount };
 
             //处理文件
+            s_logger.LogInformation("Total refDescriptors count: {Count}", refDescriptors.Length);
             int refCount = 0;
             foreach (var refDescriptor in refDescriptors)
             {
@@ -168,11 +169,12 @@ internal partial class Program
                 var applicationPackRefMoniker = refDescriptor.OwnerMoniker;
                 var moniker = applicationPackRefMoniker.Moniker;
 
-                s_logger.LogInformation("Processing pack [{PackName}:{Moniker}]. Progress {packRefCount}/{packRefAll}.",
+                s_logger.LogInformation("Processing pack [{PackName}:{Moniker}]. Progress {packRefCount}/{packRefAll}. Files: {FileCount}",
                                         refDescriptor.OwnerMoniker.OwnerVersion.OwnerPack.Name,
                                         applicationPackRefMoniker.Moniker,
                                         refCount,
-                                        refDescriptors.Length);
+                                        refDescriptors.Length,
+                                        refDescriptor.IntelliSenseFiles.Count);
 
                 int intelliSenseFileCount = 0;
                 await Parallel.ForEachAsync(refDescriptor.IntelliSenseFiles, parallelOptions, async (intelliSenseFileDescriptor, cancellationToken) =>
@@ -204,11 +206,18 @@ internal partial class Program
 
             //创建压缩文件
             var outputPackNames = refDescriptors.Select(m => $"{m.OwnerMoniker.Moniker}@{locale}@{contentCompareType}").ToHashSet();
+            s_logger.LogInformation("Creating language packs for: {OutputPackNames}", string.Join(", ", outputPackNames));
+            
             foreach (var outputPackName in outputPackNames)
             {
                 s_logger.LogInformation("start create language pack for {outputPackName}.", outputPackName);
 
                 var rootPath = Path.Combine(LocalizerEnvironment.BuildRoot, outputPackName);
+                
+                // 列出目录中的文件用于调试
+                var xmlFiles = Directory.GetFiles(rootPath, "*.xml", SearchOption.AllDirectories);
+                s_logger.LogInformation("Found {Count} xml files in {RootPath}", xmlFiles.Length, rootPath);
+                
                 DirectoryUtil.CheckDirectory(rootPath);
 
                 var finalZipFilePath = await PackLanguagePackAsync(rootPath, moniker, locale, contentCompareType, outputRoot);

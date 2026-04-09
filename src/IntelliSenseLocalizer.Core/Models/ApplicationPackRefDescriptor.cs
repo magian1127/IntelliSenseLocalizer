@@ -42,7 +42,8 @@ public class ApplicationPackRefDescriptor : IEquatable<ApplicationPackRefDescrip
         }
 
         //loop for file like C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\6.0.4\ref\net6.0\zh-cn\*.xml
-        foreach (var intelliSenseFilePath in Directory.EnumerateFiles(path, "*.xml", SearchOption.TopDirectoryOnly))
+        //Also support: C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\9.0.0\ref\net9.0\zh-cn\*.xml
+        foreach (var intelliSenseFilePath in Directory.EnumerateFiles(path, "*.xml", SearchOption.AllDirectories))
         {
             var intelliSenseName = Path.GetFileNameWithoutExtension(intelliSenseFilePath);
             var intelliSenseFileName = Path.GetFileName(intelliSenseFilePath);
